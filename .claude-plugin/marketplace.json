@@ -1,0 +1,21 @@
+{
+  "name": "jarvis",
+  "description": "Claude Code plugins by Aidan Fritzke.",
+  "owner": {
+    "name": "Aidan Fritzke"
+  },
+  "plugins": [
+    {
+      "name": "comments-by-humans",
+      "source": "./comments-by-humans",
+      "description": "The model writes the code; you explain it. A mechanical gate stops the assistant after every chunk until your own comment above it passes a fixed rubric. Runs in Claude Code, or as a standalone agent with any model.",
+      "category": "learning",
+      "tags": [
+        "learning",
+        "code-review",
+        "comments",
+        "hooks"
+      ]
+    }
+  ]
+}
