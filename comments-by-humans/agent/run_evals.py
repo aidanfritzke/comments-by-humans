@@ -5,7 +5,7 @@ The cases are the same ones `claude plugin eval` runs for the Claude Code plugin
 script puts a scratch repository into a real gate state, the prompt is sent as the human's
 message, and graders check the result. Supported graders: regex, file_exists, tool_used,
 tool_order and llm. Agent tool calls are mapped to their Claude Code equivalents (write_file to
-Write, gate to a Bash call of gate.py, and so on), so the graders work unchanged.
+Write, gate to a Bash call of the gate CLI, and so on), so the graders work unchanged.
 
   python3 run_evals.py --provider openai --model <model>
   python3 run_evals.py --provider command --command "llm -m <model>" --runs 3
@@ -149,7 +149,7 @@ def claude_code_view(event, root):
     if name == "gate" or (name == "run_command" and re.match(r"^\s*gate(\s|$)", a.get("command", ""))):
         rest = a.get("command", "")
         rest = rest.strip()[4:].strip() if name == "run_command" else rest
-        return "Bash", {"command": 'python3 "%s" %s' % (harness.engine.SCRIPT, rest)}
+        return "Bash", {"command": "%s %s" % (harness.engine.GATE, rest)}
     if name == "run_command":
         return "Bash", {"command": a.get("command")}
     if name == "read_file":

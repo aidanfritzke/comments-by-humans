@@ -10,19 +10,19 @@ Review mode runs the build loop over code that already exists. You write no code
 
 Gate status right now:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" status`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" status`
 
 Target: $ARGUMENTS
 
 ## The loop
 
-1. Present the current chunk. Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" show <id>` and show the human the location and the code, verbatim, in a code block. Tell them where to write their explanation: in the report, between the `EXPLAIN(human)` markers for that chunk, or, with `--inline`, in the placeholder the gate put above the chunk in the source. Then they save and send any message. Do not summarize, explain or critique the code before their explanation passes.
+1. Present the current chunk. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" show <id>` and show the human the location and the code, verbatim, in a code block. Tell them where to write their explanation: in the report, between the `EXPLAIN(human)` markers for that chunk, or, with `--inline`, in the placeholder the gate put above the chunk in the source. Then they save and send any message. Do not summarize, explain or critique the code before their explanation passes.
 2. Grade their explanation exactly as the build skill does, with the same rubric, depth and questioning rules (below).
 3. When it passes, run `approve`. Then share your own concerns about this chunk: up to five concrete points (bugs, unhandled edge cases, security or performance risks, unclear naming), each tied to a line. Say plainly when you have none.
 4. The human decides which concerns become findings, and may add their own. Record each one they choose with
-   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" finding <id> "text of the finding"`
+   `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" finding <id> "text of the finding"`
    (one command per finding, no `$` or backticks in the text). They can also edit the Findings list in the report themselves.
-5. Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" next`. It refuses until the current chunk has passed. When no chunks remain it finishes the report; then summarize the findings and give the report path.
+5. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" next`. It refuses until the current chunk has passed. When no chunks remain it finishes the report; then summarize the findings and give the report path.
 
 ## Rubric
 
@@ -44,8 +44,8 @@ Depth `light` scores What and Why, `normal` all four, and `strict` (the default)
 
 ## Passing
 
-- `light` or `normal`: run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" approve <id>` when the rubric is met.
-- `strict`: run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" followup <id>` first, then end your turn with one follow-up question about the chunk as the last thing in your message. Approve when the human's answer shows understanding; otherwise ask one more question.
+- `light` or `normal`: run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" approve <id>` when the rubric is met.
+- `strict`: run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" followup <id>` first, then end your turn with one follow-up question about the chunk as the last thing in your message. Approve when the human's answer shows understanding; otherwise ask one more question.
 - Run gate commands alone, exactly as shown. If the gate refuses, relay the reason in one line.
 
 The code is on disk, so nothing stops the human from reading ahead. The gate governs the report, not what they look at.

@@ -14,6 +14,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.dirname(HERE)
 GATE = os.path.join(PLUGIN, "scripts", "gate.py")
+LAUNCHER = os.path.join(PLUGIN, "scripts", "gate.sh")
 sys.path.insert(0, os.path.join(PLUGIN, "scripts"))
 import comments  # noqa: E402
 
@@ -202,13 +203,21 @@ class TestSkeleton(GateCase):
             ("Bash", {"command": 'python3 "%s" finding r01 "$(touch x.py)"' % GATE}),
             ("Bash", {"command": 'python3 "%s" status | tee x.py' % GATE}),
             ("Bash", {"command": 'python3 /tmp/gate.py status'}),
+            ("Bash", {"command": 'sh "%s" approve c01; touch x.py' % LAUNCHER}),
+            ("Bash", {"command": 'sh /tmp/gate.sh status'}),
+            ("Bash", {"command": 'sh "%s" status' % GATE}),
+            ("Bash", {"command": 'node "%s" status' % GATE}),
         ]
         for tool, ti in cases:
             code, _, err = self.pre(tool, ti)
             self.assertEqual(code, 2, "%s %s should be denied" % (tool, ti))
             self.assertIn("comments-by-humans", err)
-        for cmd in ('python3 "%s" status' % GATE, "python3 %s show c01" % GATE,
-                    'python3 "%s" finding r01 "quoted; text (fine)"' % GATE):
+        # Unquoted paths lose their backslashes in a POSIX shell, so that form uses forward slashes.
+        for cmd in ('python3 "%s" status' % GATE, "python3 %s show c01" % GATE.replace(os.sep, "/"),
+                    'python3 "%s" finding r01 "quoted; text (fine)"' % GATE,
+                    'sh "%s" status' % LAUNCHER, 'bash "%s" approve c01' % LAUNCHER,
+                    'python "%s" status' % GATE, 'py -3 "%s" status' % GATE,
+                    'py -3.12 "%s" next-id' % GATE, '/usr/bin/python3.12 "%s" status' % GATE):
             self.assertEqual(self.pre("Bash", {"command": cmd})[0], 0, cmd)
         self.assertEqual(self.pre("mcp__github__get_file_contents", {"path": "x"})[0], 0)
         # Subagent tool calls carry agent_id and are gated the same way.
@@ -513,6 +522,73 @@ class TestHardening(GateCase):
         code, _, _ = self.pre("Skill", {"skill": "comments-by-humans:build", "args": "x"})
         self.assertEqual(code, 0)
         self.assertEqual(self.state()["mode"], "build")
+
+    def test_crlf_files_are_checked_like_lf(self):
+        # Claude Code's Edit matches LF strings against CRLF files, so the gate must too.
+        self.config(depth="light")
+        self.locked_on_c01()
+        self.human_comment("retry.py", "c01", GOOD_COMMENT)
+        self.say()
+        self.cli("approve", "c01")
+        with open(self.path("retry.py"), newline="") as f:
+            src = f.read().replace("\r\n", "\n")
+        with open(self.path("retry.py"), "w", newline="") as f:
+            f.write(src.replace("\n", "\r\n"))
+        self.assertIn("only the human edits it", self.edit(
+            "retry.py", "# Calls fn until it succeeds, sleeping 1s, 2s, 4s between failures so a flaky\n"
+                        "# service can recover.", "# Calls fn.\n# Retries.", expect_ok=False))
+        self.assertIn("outside any chunk", self.edit(
+            "retry.py", 'raise RuntimeError("out of attempts")\n',
+            'raise RuntimeError("out of attempts")\n\n\ndef double(x):\n    return 2 * x\n', expect_ok=False))
+
+
+@unittest.skipUnless(shutil.which("sh"), "needs a POSIX sh, as Claude Code hooks do")
+class TestLauncher(GateCase):
+    """scripts/gate.sh, which hooks and the gate CLI use to find a working Python 3."""
+
+    def launch(self, *args, stdin="", **env):
+        e = self.env()
+        e.update(env)
+        out = subprocess.run(["sh", LAUNCHER] + list(args), input=stdin, capture_output=True, text=True,
+                             cwd=self.repo, env=e, timeout=60)
+        return out.returncode, out.stdout + out.stderr
+
+    def without_python(self):
+        """PATH entries that shadow py, python3 and python with stand-ins for the Windows Store aliases."""
+        stubs = tempfile.mkdtemp(prefix="cbh-stubs-")
+        self.addCleanup(shutil.rmtree, stubs, True)
+        for name in ("py", "python3", "python"):
+            with open(os.path.join(stubs, name), "w", newline="\n") as f:
+                f.write("#!/bin/sh\necho 'Python was not found' >&2\nexit 49\n")
+            os.chmod(os.path.join(stubs, name), 0o755)
+        return {"PATH": stubs + os.pathsep + os.environ.get("PATH", ""), "CBH_PYTHON": ""}
+
+    def test_runs_the_gate_with_any_python3(self):
+        code, out = self.launch("status")
+        self.assertEqual(code, 0, out)
+        self.assertIn("off", out)
+        code, out = self.launch("status", **dict(self.without_python(), CBH_PYTHON=sys.executable))
+        self.assertEqual(code, 0, out)
+        self.assertIn("off", out)
+
+    def test_hooks_run_through_the_launcher(self):
+        self.locked_on_c01()
+        payload = {"hook_event_name": "PreToolUse", "tool_name": "Write", "cwd": self.repo,
+                   "tool_input": {"file_path": self.path("b.py"), "content": "1"}}
+        code, out = self.launch("hook", "pre-write", stdin=json.dumps(payload))
+        self.assertEqual(code, 2, out)
+        self.assertIn("LOCKED on c01", out)
+
+    def test_without_python_fails_closed_only_where_a_gate_exists(self):
+        env = self.without_python()
+        self.assertEqual(self.launch("hook", "pre-write", stdin="{}", **env)[0], 0)
+        code, out = self.launch("status", **env)
+        self.assertEqual(code, 1)
+        self.assertIn("no working Python 3", out)
+        self.locked_on_c01()
+        code, out = self.launch("hook", "pre-write", stdin="{}", **env)
+        self.assertEqual(code, 2)
+        self.assertIn("fails closed", out)
 
 
 # ---------------------------------------------------------------------------

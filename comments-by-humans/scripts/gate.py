@@ -22,7 +22,9 @@ SCRIPT = os.path.realpath(os.path.abspath(__file__))
 if os.path.dirname(SCRIPT) not in sys.path:
     sys.path.insert(0, os.path.dirname(SCRIPT))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(SCRIPT))
-GATE = 'python3 "%s"' % SCRIPT
+# gate.sh finds a working Python 3, so the commands Claude runs do not depend on a python3 alias.
+LAUNCHER = os.path.join(os.path.dirname(SCRIPT), "gate.sh")
+GATE = 'sh "%s"' % LAUNCHER
 
 CLAUDE_COMMANDS = ("status", "approve", "followup", "next", "finding", "show", "next-id", "help")
 SKILLS = ("build", "review", "pause", "status")
@@ -572,6 +574,10 @@ def hook_pre_write(gate, state, payload):
         return
     old = read_text(path) if os.path.isfile(path) else ""
     new = new_text_for(tool, payload.get("tool_input") or {}, old)
+    if new is None and "\r\n" in old:
+        # Claude Code's Edit matches LF strings against CRLF files, so predict the edit on LF text.
+        old = old.replace("\r\n", "\n")
+        new = new_text_for(tool, payload.get("tool_input") or {}, old)
     if new is None:
         return  # the tool itself will fail
     import comments
@@ -782,9 +788,16 @@ _PLUGIN_OFF = re.compile(r"\bclaude\s+plugins?\s+(?:disable|uninstall|remove|rm|
 _SETTINGS = re.compile(r"\.claude/settings[^\s'\"]*\.json")
 _WRITE_VERB = re.compile(r">|\b(?:tee|sed|rm|mv|cp|ln|truncate|chmod|python3?|node|perl|ruby|jq|awk|dd|"
                          r"install|rsync|git|echo|printf|cat)\b")
+_SHELL = re.compile(r"^(?:ba)?sh(?:\.exe)?$", re.I)
+_PYTHON = re.compile(r"^(?:python(?:3(?:\.\d+)?)?|py)(?:\.exe)?$", re.I)
+
+
+def _same_file(arg, path):
+    return os.path.normcase(os.path.realpath(os.path.expanduser(arg))) == os.path.normcase(path)
 
 
 def is_gate_cli(cmd):
+    """One bare gate CLI call: `sh gate.sh <command> ...`, or any Python 3 running gate.py."""
     import shlex
     if "\n" in cmd or "$" in cmd or "`" in cmd:
         return False
@@ -796,10 +809,16 @@ def is_gate_cli(cmd):
         return False
     if len(tokens) < 3 or any(t and all(c in "();<>|&" for c in t) for t in tokens):
         return False
-    if not re.match(r"^python3?(\.\d+)?$", os.path.basename(tokens[0])):
+    exe, args = os.path.basename(tokens[0]), tokens[1:]
+    if _SHELL.match(exe):
+        script = LAUNCHER
+    elif _PYTHON.match(exe):
+        script = SCRIPT
+        if exe.lower() in ("py", "py.exe") and re.match(r"^-3(\.\d+)?$", args[0]):
+            args = args[1:]  # the Windows launcher: py -3 gate.py ...
+    else:
         return False
-    target = os.path.realpath(os.path.expanduser(tokens[1]))
-    return target == SCRIPT and tokens[2] in CLAUDE_COMMANDS
+    return len(args) >= 2 and _same_file(args[0], script) and args[1] in CLAUDE_COMMANDS
 
 
 def _targets_code(gate, path, cfg):

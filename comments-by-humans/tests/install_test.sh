@@ -4,7 +4,7 @@
 #   comments-by-humans/tests/install_test.sh [marketplace]
 #
 # The marketplace defaults to this checkout (a directory source). Pass owner/repo#ref to test
-# the published copy, for example: aidanfritzke/jarvis#jarvis-comments-by-humans
+# the published copy, for example: aidanfritzke/comments-by-humans#main
 #
 # The session step needs a model credential that works without your usual home directory,
 # such as ANTHROPIC_API_KEY. Without one, that step is skipped and the rest still runs.
@@ -26,10 +26,8 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
 step "requirements"
 command -v claude >/dev/null || fail "claude is not on PATH"
-command -v python3 >/dev/null || fail "python3 is not on PATH"
 command -v git >/dev/null || fail "git is not on PATH"
 claude --version
-python3 --version
 
 if [ -d "$SOURCE" ]; then
   step "validate $SOURCE"
@@ -40,16 +38,16 @@ fi
 step "add marketplace $SOURCE"
 claude plugin marketplace add "$SOURCE"
 
-step "install comments-by-humans@jarvis"
-claude plugin install comments-by-humans@jarvis
+step "install comments-by-humans@comments-by-humans"
+claude plugin install comments-by-humans@comments-by-humans
 claude plugin list | tee "$WORK/list.txt"
 grep -q "comments-by-humans" "$WORK/list.txt" || fail "the plugin is not listed after install"
 
 step "the installed copy runs"
-GATE="$(find "$HOME/.claude" -path '*comments-by-humans*/scripts/gate.py' | head -n 1)"
-[ -n "$GATE" ] || fail "gate.py is not in the installed plugin"
+GATE="$(find "$HOME/.claude" -path '*comments-by-humans*/scripts/gate.sh' | head -n 1)"
+[ -n "$GATE" ] || fail "gate.sh is not in the installed plugin"
 echo "$GATE"
-python3 "$GATE" help >/dev/null
+sh "$GATE" help >/dev/null || fail "the installed gate does not run; is Python 3 installed?"
 
 step "a lock set by hand blocks writes and commands"
 cd "$WORK/project"

@@ -10,7 +10,7 @@ You write the code. The human explains it. After every chunk you write, a gate l
 
 Gate status right now:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" status`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" status`
 
 Task: $ARGUMENTS
 
@@ -82,9 +82,9 @@ When the human sends a message while the gate is locked, the gate tells you whet
 ## Passing
 
 - `light` or `normal`: when the comment meets the rubric, run
-  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" approve <id>`
+  `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" approve <id>`
 - `strict`: when the comment meets the rubric, first run
-  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" followup <id>`,
+  `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" followup <id>`,
   then end your turn with ONE follow-up question about the chunk that needs real understanding to answer, such as what breaks if a given line changes, or what the caller sees in a specific case. Make the question the last thing in your message. When the human answers in chat: if the answer shows understanding, run `approve`; if not, ask one more question and wait again.
 - Run gate commands exactly as shown, alone, with no `cd`, pipes, redirects or `$`. While the gate is locked, they are the only commands that run.
 - The gate decides. If `approve` refuses, tell the human the reason in one line and do what it asks.
@@ -92,5 +92,5 @@ When the human sends a message while the gate is locked, the gate tells you whet
 
 ## Commands
 
-- `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" status`: mode, lock, current chunk, attempts, next free id
-- `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" show [id]`: a chunk's comment and code with line numbers
+- `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" status`: mode, lock, current chunk, attempts, next free id
+- `sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" show [id]`: a chunk's comment and code with line numbers

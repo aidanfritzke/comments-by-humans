@@ -13,18 +13,18 @@ It runs two ways, on one gate engine (`scripts/gate.py`):
 | **Claude Code plugin** | Whatever model Claude Code runs | Claude Code hooks |
 | **Standalone agent** (`agent/cbh.py`) | Any model: Anthropic, OpenAI, Gemini, Ollama, OpenRouter, Groq, Mistral, DeepSeek, xAI, Together, LM Studio, vLLM, any OpenAI-compatible server, or any command-line model | The agent's own tool layer |
 
-Requires Python 3 and nothing else; the Claude Code front end also needs Claude Code. Tested with Claude Code 2.1.289 and Python 3.11.
+Requires Python 3 and nothing else; the Claude Code front end also needs Claude Code. Any working Python 3 interpreter will do: the hooks find one through `scripts/gate.sh`, which tries `$CBH_PYTHON`, then `py -3`, `python3` and `python`, and skips the Microsoft Store aliases that Windows installs without a real interpreter. Set `CBH_PYTHON` to an interpreter's path to choose one. On Windows, Claude Code must run hooks in Git Bash, its default; without Git Bash it falls back to PowerShell, which this plugin does not support. Tested with Claude Code 2.1.289 and Python 3.11.
 
 ## Install
 
 **Claude Code:**
 
 ```
-/plugin marketplace add aidanfritzke/jarvis
-/plugin install comments-by-humans@jarvis
+/plugin marketplace add aidanfritzke/comments-by-humans
+/plugin install comments-by-humans@comments-by-humans
 ```
 
-To install from a branch, pin it: `/plugin marketplace add aidanfritzke/jarvis#jarvis-comments-by-humans-model-agnostic`. From a shell, the same commands are `claude plugin marketplace add ...` and `claude plugin install ...`.
+To install from a branch, pin it: `/plugin marketplace add aidanfritzke/comments-by-humans#<branch>`. From a shell, the same commands are `claude plugin marketplace add ...` and `claude plugin install ...`.
 
 **Any other model:** clone this repository (or copy its `comments-by-humans/` directory) and run `python3 comments-by-humans/agent/cbh.py`. Nothing to install.
 
@@ -108,7 +108,7 @@ The code is on disk, so nothing stops you reading ahead. The gate governs the re
 
 ## How the gate is enforced
 
-In Claude Code, six hook entries call one script, `scripts/gate.py`. It reads `.comments-by-humans/state.json` and exits at once when the mode is off. The standalone agent calls the same checks through `gate.py`'s library API (`api_pre_tool`, `api_post_tool`, `api_prompt`, `api_command`, `api_cli`) before and after each of its own tools, with the same results.
+In Claude Code, six hook entries call one script, `scripts/gate.py`, through the `scripts/gate.sh` launcher. It reads `.comments-by-humans/state.json` and exits at once when the mode is off. The standalone agent calls the same checks through `gate.py`'s library API (`api_pre_tool`, `api_post_tool`, `api_prompt`, `api_command`, `api_cli`) before and after each of its own tools, with the same results.
 
 | Hook | Job |
 | --- | --- |
@@ -123,7 +123,7 @@ In Claude Code, six hook entries call one script, `scripts/gate.py`. It reads `.
 
 **Re-gating.** Any change Claude makes to an explained chunk reopens its gate: the tag reverts to `EXPLAIN(human)`, your comment stays for you to update, and the lock is set.
 
-**Fail closed.** A hook that times out, or exits with any code other than 2, does not block. The script therefore exits 2 on any internal error, including a corrupt state file.
+**Fail closed.** A hook that times out, or exits with any code other than 2, does not block. The script therefore exits 2 on any internal error, including a corrupt state file. If the launcher finds no working Python 3, it exits 2 in any project that has a gate and 0 elsewhere, so a missing interpreter never blocks projects that do not use the plugin.
 
 **Protected paths.** While the gate exists, Claude's writes to `.comments-by-humans/`, `.claude/settings*.json`, `~/.claude/settings*.json`, `~/.claude/plugins/` and the plugin itself are denied, as are shell commands that touch them or disable the plugin. Hooks also fire inside subagents, so delegating a write does not bypass the lock.
 
@@ -169,6 +169,7 @@ comments-by-humans/
 ├── skills/                    build, review, pause, status
 ├── hooks/hooks.json
 ├── scripts/
+│   ├── gate.sh                launcher: runs gate.py with the first working Python 3
 │   ├── gate.py                gate engine: state machine, Claude Code hook entry points, gate CLI,
 │   │                          and the library API the agent calls
 │   └── comments.py            comment syntax per language, markers, chunk extents, review chunker
@@ -223,8 +224,12 @@ Profiles live in `evals/learner/profiles.json`: `diligent`, `weak-first`, `wrong
 Install test on a clean home directory:
 
 ```
-comments-by-humans/tests/install_test.sh                      # this checkout
-comments-by-humans/tests/install_test.sh aidanfritzke/jarvis   # the published marketplace
+comments-by-humans/tests/install_test.sh                                   # this checkout
+comments-by-humans/tests/install_test.sh aidanfritzke/comments-by-humans   # the published marketplace
 ```
 
 The design spec is in [`docs/comments-by-humans-spec.md`](../docs/comments-by-humans-spec.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

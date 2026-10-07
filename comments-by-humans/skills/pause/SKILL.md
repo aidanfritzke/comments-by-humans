@@ -8,6 +8,6 @@ disable-model-invocation: true
 
 The human paused the gate. A hook recorded the pause when they typed this command, and logged it.
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gate.py" status`
+!`sh "${CLAUDE_PLUGIN_ROOT}/scripts/gate.sh" status`
 
 Confirm in one or two lines that the gate is paused, that code written while paused is logged as ungated, and that `/comments-by-humans:build` or `/comments-by-humans:review` turns it back on (any chunk that was waiting stays pending). Then help with whatever the human asks next.
